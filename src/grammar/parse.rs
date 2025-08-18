@@ -547,7 +547,7 @@ fn custom_<'t, 's>(
     let known_ops = vec![
         "==", "<", ">", "<=", ">=", "&&", "||", "++", "//", "!!", "=", ":=", "+=", "-=", "*=",
         "//=", "&&=", "||=", "++=", "**=", "+", "-", "*", "$=", "**", "|", "..", "..=", "->", "λ",
-        ",", ";", "</", ">>", "!=", "::",
+        ",", ";", "</", ">>", "!=", "::", "&",
     ];
 
     let Some(next) = peek(ts) else {
@@ -612,10 +612,46 @@ fn unary_not<'t, 's>(
         let start = peek_range_start(ts);
         let end = peek_range_start(ts);
 
-        let (ts, n) = pow(&ts[1..], ctx)?;
+        let (ts, n) = unary_deref(&ts[1..], ctx)?;
         Ok((
             ts,
             NodeInner::UnaryOperation(UnaryOperation::Not, Box::new(n)).to_node((start, end)),
+        ))
+    } else {
+        unary_deref(ts, ctx)
+    }
+}
+
+fn unary_deref<'t, 's>(
+    ts: Tokens<'t, 's>,
+    ctx: ParsingContext,
+) -> Result<(Tokens<'t, 's>, Ast), ParseError> {
+    if peek_and_compare(ts, "*") {
+        let start = peek_range_start(ts);
+        let end = peek_range_start(ts);
+
+        let (ts, n) = unary_address_of(&ts[1..], ctx)?;
+        Ok((
+            ts,
+            NodeInner::UnaryOperation(UnaryOperation::Deref, Box::new(n)).to_node((start, end)),
+        ))
+    } else {
+        unary_address_of(ts, ctx)
+    }
+}
+
+fn unary_address_of<'t, 's>(
+    ts: Tokens<'t, 's>,
+    ctx: ParsingContext,
+) -> Result<(Tokens<'t, 's>, Ast), ParseError> {
+    if peek_and_compare(ts, "&") {
+        let start = peek_range_start(ts);
+        let end = peek_range_start(ts);
+
+        let (ts, n) = pow(&ts[1..], ctx)?;
+        Ok((
+            ts,
+            NodeInner::UnaryOperation(UnaryOperation::AddressOf, Box::new(n)).to_node((start, end)),
         ))
     } else {
         pow(ts, ctx)

@@ -247,6 +247,11 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                 let vreg = ctx.declare(&ident, Type::Ptr(Box::new(rhs_val.type_.clone())));
 
                 insts.push(Inst {
+                    assigns: Some(vreg.as_value()),
+                    inner: InstInner::Alloca,
+                });
+
+                insts.push(Inst {
                     assigns: None,
                     inner: InstInner::Store(vreg.as_value(), rhs_val),
                 });
@@ -363,6 +368,49 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             });
 
             assigns = None;
+        }
+        NodeInner::UnaryOperation(op, value) => {
+            let lhs = generate(*value, ctx)?;
+            let Some(lhs_val) = lhs.assigns else {
+                return CompErr::new_general(
+                    format!(
+                        "Left hand side of {} was not a valid expression",
+                        op.stringify()
+                    ),
+                    ast.range,
+                );
+            };
+            insts.extend(lhs.insts);
+
+            match op {
+                crate::grammar::UnaryOperation::Negate => todo!(),
+                crate::grammar::UnaryOperation::Not => todo!(),
+                crate::grammar::UnaryOperation::Deref => {
+                    let Some(t) = lhs_val.type_.clone().deref() else {
+                        return CompErr::new_general(
+                            format!("Could not dereference {:?}", lhs_val.type_),
+                            ast.range,
+                        );
+                    };
+
+                    assigns = Some(new_vreg(t));
+
+                    insts.push(Inst {
+                        assigns: assigns.clone(),
+                        inner: InstInner::Load(lhs_val),
+                    });
+                }
+                crate::grammar::UnaryOperation::AddressOf => {
+                    let t = Type::Ptr(Box::new(lhs_val.type_.clone()));
+
+                    assigns = Some(new_vreg(t));
+
+                    insts.push(Inst {
+                        assigns: assigns.clone(),
+                        inner: InstInner::Lea(lhs_val),
+                    });
+                }
+            }
         }
         NodeInner::For { var, range, body } => {
             let start_label = new_id();

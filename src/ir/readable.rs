@@ -53,6 +53,10 @@ pub fn write_readable(mut to: impl std::io::Write, ir: &IrSnippet) -> std::io::R
             crate::ir::InstInner::Alloca => {
                 write!(to, "Alloca")?;
             }
+            crate::ir::InstInner::Lea(value) => {
+                write!(to, "Lea ")?;
+                write_value(&mut to, value)?;
+            }
         }
 
         let _ = writeln!(to);

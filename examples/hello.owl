@@ -10,7 +10,9 @@ if true {
     a := 3;
     a += 2;
 
-    println(2+2*(5+4 + a)) 
+    b := * &a;
+
+    println(2+2*(5+4 + a)); 
 } else {
     println() 
 }

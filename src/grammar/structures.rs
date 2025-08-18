@@ -60,6 +60,8 @@ pub enum NodeInner {
     },
     ObjectLiteral(Vec<(String, Node)>),
     Type(Type),
+    Deref(Box<Node>),
+    AddressOf(Box<Node>),
     Break,
     Continue,
 }
@@ -77,6 +79,8 @@ impl NodeInner {
 pub enum UnaryOperation {
     Negate,
     Not,
+    Deref,
+    AddressOf,
 }
 
 impl UnaryOperation {
@@ -84,6 +88,8 @@ impl UnaryOperation {
         match self {
             UnaryOperation::Negate => "-".to_string(),
             UnaryOperation::Not => "!".to_string(),
+            UnaryOperation::Deref => "*".to_string(),
+            UnaryOperation::AddressOf => "&".to_string(),
         }
     }
 }

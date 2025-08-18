@@ -45,6 +45,7 @@ pub fn exec(ir: IrSnippet) {
             InstInner::Store(_, value) => todo!(),
             InstInner::Copy(value) => todo!(),
             InstInner::Alloca => todo!(),
+            InstInner::Lea(value) => todo!(),
         }
 
         pc += 1;

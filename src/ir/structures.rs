@@ -28,6 +28,7 @@ pub enum InstInner {
     Load(Value),
     Store(Value, Value),
     Copy(Value),
+    Lea(Value),
     Alloca,
 }
 
