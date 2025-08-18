@@ -3,16 +3,17 @@ Foo :: struct {
     b: ***bool,
 }
 
-a := 3 + 23 * 23 - 4;
-println(a);
+a := 3 + 23 * 23 - 4
+println(a)
 
 if true { 
-    a := 3;
-    a += 2;
+    a := 3
+    a += 2
+    a = a + 2
 
-    b := * &a;
+    b := * &a
 
-    println(2+2*(5+4 + a)); 
+    println(2+2*(5+4 + a))
 } else {
     println() 
 }

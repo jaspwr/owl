@@ -75,7 +75,11 @@ macro_rules! expect_exact_token {
     ($token:expr, $ts:expr) => {
         if !peek_and_compare(&$ts, $token) {
             return ParseError::new_misc(
-                format!("Expected `{}`", $token),
+                if $ts.is_empty() {
+                    format!("Expected `{}` but reached end of file", $token)
+                } else {
+                    format!("Expected `{}` but got `{}`", $token, $ts[0].token)
+                },
                 if $ts.is_empty() { (0, 0) } else { $ts[0].range },
             );
         }
@@ -758,8 +762,6 @@ fn array<'t, 's>(
     if peek_and_compare(ts, "[") {
         let start = peek_range_start(ts);
 
-        let uncolosed_error = ParseError::new_misc("Expected `]`", ts[0].range);
-
         ts = &ts[1..];
 
         let mut items = vec![];
@@ -776,20 +778,11 @@ fn array<'t, 's>(
             }
         }
 
-        let Some(next) = ts.iter().next() else {
-            return uncolosed_error;
-        };
+        expect_exact_token!("]", ts);
 
-        if next.token == "]" {
-            let end = peek_range_start(ts);
+        let end = peek_range_start(ts);
 
-            Ok((
-                &ts[1..],
-                NodeInner::ArrayLiteral(items).to_node((start, end)),
-            ))
-        } else {
-            uncolosed_error
-        }
+        Ok((&ts, NodeInner::ArrayLiteral(items).to_node((start, end))))
     } else {
         scope(ts, ctx)
     }
@@ -806,26 +799,15 @@ fn scope<'t, 's>(
             return object_literal(ts, ctx);
         }
 
-        let uncolosed_error = ParseError::new_misc("Expected `}`", ts[0].range);
-
         ts = &ts[1..];
 
-        let (ts, body) = statement_list(ts, ParsingContext { ..ctx })?;
+        let (mut ts, body) = statement_list(ts, ParsingContext { ..ctx })?;
 
-        let Some(next) = ts.iter().next() else {
-            return uncolosed_error;
-        };
+        expect_exact_token!("}", ts);
 
-        if next.token == "}" {
-            let end = peek_range_end(ts);
+        let end = peek_range_end(ts);
 
-            Ok((
-                &ts[1..],
-                NodeInner::Scope(Box::new(body)).to_node((start, end)),
-            ))
-        } else {
-            uncolosed_error
-        }
+        Ok((&ts, NodeInner::Scope(Box::new(body)).to_node((start, end))))
     } else {
         markup(ts, ctx)
     }
