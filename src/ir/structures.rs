@@ -8,6 +8,8 @@ pub struct Inst {
     pub inner: InstInner,
 }
 
+pub type InstLoc = usize;
+
 #[derive(Debug, Clone)]
 pub enum InstInner {
     BinOp {
@@ -63,3 +65,4 @@ impl Value {
         None
     }
 }
+

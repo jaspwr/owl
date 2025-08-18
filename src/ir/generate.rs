@@ -10,12 +10,12 @@ use crate::{
 use super::*;
 
 pub struct IrSnippet {
-    pub insts: LinkedList<Inst>,
+    pub insts: Vec<Inst>,
     pub assigns: Option<Value>,
 }
 
 impl IrSnippet {
-    pub fn debug_print(self) {
+    pub fn debug_print(&self) {
         readable::write_readable(std::io::stdout(), self).unwrap();
 
         // for inst in &self.insts {
@@ -104,7 +104,7 @@ impl StorageItem {
 }
 
 pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
-    let mut insts = LinkedList::new();
+    let mut insts = Vec::new();
     let assigns;
 
     match ast.inner {
@@ -125,9 +125,16 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                 );
             };
 
-            assigns = Some(new_vreg(var.type_.clone()));
+            let Some(t) = var.type_.clone().deref() else {
+                return CompErr::new_general(
+                    format!("Cannot derefernce {:?}", var.type_),
+                    ast.range,
+                );
+            };
 
-            insts.push_back(Inst {
+            assigns = Some(new_vreg(t));
+
+            insts.push(Inst {
                 assigns: assigns.clone(),
                 inner: InstInner::Load(var.as_value()),
             });
@@ -152,7 +159,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
             assigns = Some(new_vreg(Type::Auto));
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: assigns.clone(),
                 inner: InstInner::Call {
                     fn_name,
@@ -184,7 +191,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             let then_branch_label = new_id();
             let end_label = new_id();
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Jz(then_branch_label, cond_val),
             });
@@ -192,13 +199,13 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             insts.extend(then.insts);
 
             if else_branch.is_some() {
-                insts.push_back(Inst {
+                insts.push(Inst {
                     assigns: None,
                     inner: InstInner::Jmp(end_label),
                 });
             }
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Label(then_branch_label),
             });
@@ -208,7 +215,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
                 insts.extend(else_.insts);
 
-                insts.push_back(Inst {
+                insts.push(Inst {
                     assigns: None,
                     inner: InstInner::Label(end_label),
                 });
@@ -237,9 +244,9 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                 };
                 insts.extend(rhs.insts);
 
-                let vreg = ctx.declare(&ident, rhs_val.type_.clone());
+                let vreg = ctx.declare(&ident, Type::Ptr(Box::new(rhs_val.type_.clone())));
 
-                insts.push_back(Inst {
+                insts.push(Inst {
                     assigns: None,
                     inner: InstInner::Store(vreg.as_value(), rhs_val),
                 });
@@ -284,7 +291,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
             assigns = Some(new_vreg(rhs_val.type_.clone()));
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: assigns.clone(),
                 inner: InstInner::BinOp {
                     op,
@@ -318,7 +325,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             let start_label = new_id();
             let end_label = new_id();
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Label(start_label),
             });
@@ -335,7 +342,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                 );
             };
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Jz(end_label, cond_val),
             });
@@ -345,12 +352,12 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
             ctx.pop_scope();
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Jmp(start_label),
             });
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Label(end_label),
             });
@@ -361,7 +368,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             let start_label = new_id();
             let end_label = new_id();
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Label(start_label),
             });
@@ -396,12 +403,12 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
             ctx.pop_scope();
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Jmp(start_label),
             });
 
-            insts.push_back(Inst {
+            insts.push(Inst {
                 assigns: None,
                 inner: InstInner::Label(end_label),
             });

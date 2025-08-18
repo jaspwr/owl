@@ -7,6 +7,7 @@ pub mod utils;
 pub mod error;
 pub mod types;
 pub mod backends;
+pub mod reg_alloc;
 
 fn main() {
     if env::args().len() == 2 {
@@ -38,6 +39,6 @@ fn main() {
 
         snippet.debug_print();
 
-        // backends::codegen(snippet, "bleh.asm");
+        backends::codegen(snippet, "bleh.asm");
     }
 }

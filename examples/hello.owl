@@ -18,11 +18,3 @@ if true {
 while true {
     println(2) 
 }
-
-for i in 0 <> 4 {
-    println(i) 
-}
-
-for 0 <> 4 {
-    println(it) 
-}

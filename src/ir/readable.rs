@@ -1,16 +1,16 @@
 use crate::ir::{IrSnippet, Value};
 
-pub fn write_readable(mut to: impl std::io::Write, ir: IrSnippet) -> std::io::Result<()> {
-    for inst in ir.insts {
+pub fn write_readable(mut to: impl std::io::Write, ir: &IrSnippet) -> std::io::Result<()> {
+    for inst in &ir.insts {
         if !matches!(inst.inner, crate::ir::InstInner::Label(_)) {
             write!(to, "    ")?;
         }
 
-        if let Some(assigns) = inst.assigns {
+        if let Some(assigns) = &inst.assigns {
             write!(to, "%{}:{:?} = ", assigns.as_vreg().unwrap(), assigns.type_)?;
         }
 
-        match inst.inner {
+        match inst.inner.clone() {
             crate::ir::InstInner::BinOp { op, lhs, rhs } => {
                 write!(to, "{:?} ", op)?;
                 write_value(&mut to, lhs)?;
