@@ -1,0 +1,8 @@
+[package]
+name = "owl"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# inkwell = { git = "https://github.com/TheDan64/inkwell", features = ["llvm18-1-force-static", "target-all"] }
+owo-colors = "4.2.0"

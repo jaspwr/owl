@@ -1,0 +1,28 @@
+Foo :: struct {
+    a: f64,
+    b: ***bool,
+}
+
+a := 3 + 23 * 23 - 4;
+println(a);
+
+if true { 
+    a := 3;
+    a += 2;
+
+    println(2+2*(5+4 + a)) 
+} else {
+    println() 
+}
+
+while true {
+    println(2) 
+}
+
+for i in 0 <> 4 {
+    println(i) 
+}
+
+for 0 <> 4 {
+    println(it) 
+}
