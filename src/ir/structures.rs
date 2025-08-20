@@ -26,14 +26,12 @@ pub enum InstInner {
         args: Vec<Value>,
     },
     Label(VregId),
-    Jnz(VregId, Value),
     Jz(VregId, Value),
     Jmp(VregId),
     Ret(Value),
+    Cast(Value),
     Load(Value),
     Store(Value, Value),
-    Copy(Value),
-    Lea(Value),
     Alloca,
 }
 
@@ -56,7 +54,6 @@ pub enum ValueInner {
     ImmediateInt(i64),
     ImmediateFloat(f32),
     ImmediateDouble(f64),
-    ImmediateBool(bool),
     StringLiteral(usize),
 }
 
@@ -93,7 +90,7 @@ impl Value {
     pub(crate) fn bool_immediate(arg: bool) -> Value {
         Self {
             type_: Type::Boolean,
-            inner: ValueInner::ImmediateBool(arg),
+            inner: ValueInner::ImmediateInt(if arg { 1 } else { 0 }),
         }
     }
 

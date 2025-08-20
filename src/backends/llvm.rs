@@ -1,6 +1,9 @@
 use crate::data::Data;
-use crate::ir::{IrSnippet, Value, VregId};
+use crate::grammar::BinaryOperation;
+use crate::ir::{new_id, InstInner, IrSnippet, Value, VregId};
+use crate::types::Type;
 
+use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::execution_engine::{ExecutionEngine, JitFunction};
@@ -8,8 +11,8 @@ use inkwell::module::Module;
 use inkwell::targets::{
     CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
-use inkwell::types::BasicMetadataTypeEnum;
-use inkwell::values::{BasicValue, BasicValueEnum};
+use inkwell::types::{AnyType, BasicMetadataTypeEnum, BasicType};
+use inkwell::values::{BasicValue, BasicValueEnum, InstructionOpcode};
 use inkwell::{AddressSpace, OptimizationLevel};
 
 use std::collections::HashMap;
@@ -60,6 +63,14 @@ pub fn codegen(ir: IrSnippet, data: Data, path: impl AsRef<Path>) {
 
     builder.position_at_end(basic_block);
 
+    let mut basic_blocks: HashMap<VregId, BasicBlock> = HashMap::new();
+
+    for inst in &ir.insts {
+        if let InstInner::Label(l) = inst.inner {
+            basic_blocks.insert(l, context.append_basic_block(function, &format!("l{}", l)));
+        }
+    }
+
     let mut values: HashMap<VregId, BasicValueEnum> = HashMap::new();
 
     let string_literals = data
@@ -89,34 +100,129 @@ pub fn codegen(ir: IrSnippet, data: Data, path: impl AsRef<Path>) {
                 }
                 crate::ir::ValueInner::ImmediateFloat(_) => todo!(),
                 crate::ir::ValueInner::ImmediateDouble(_) => todo!(),
-                crate::ir::ValueInner::ImmediateBool(_) => todo!(),
                 crate::ir::ValueInner::StringLiteral(id) => &string_literals[id],
             }
         };
     }
 
+    let get_type = |t: Type| match t {
+        Type::Auto(hash_set) => todo!(),
+        Type::Void => todo!(),
+        Type::F32 => context.f32_type().as_basic_type_enum(),
+        Type::F64 => context.f64_type().as_basic_type_enum(),
+        Type::Boolean => context.bool_type().as_basic_type_enum(),
+        Type::Integer {
+            bits: 1,
+            signed: true,
+        } => context.bool_type().as_basic_type_enum(),
+        Type::Integer {
+            bits: 16,
+            signed: true,
+        } => context.i16_type().as_basic_type_enum(),
+        Type::Integer {
+            bits: 32,
+            signed: true,
+        } => context.i32_type().as_basic_type_enum(),
+        Type::Integer {
+            bits: 64,
+            signed: true,
+        } => context.i64_type().as_basic_type_enum(),
+        Type::Integer {
+            bits: 128,
+            signed: true,
+        } => context.i128_type().as_basic_type_enum(),
+        Type::Integer { bits, signed } => context.i32_type().as_basic_type_enum(),
+        Type::Ptr(_) => context.ptr_type(AddressSpace::default()).as_basic_type_enum(),
+        Type::Struct(name_and_types) => todo!(),
+        Type::Ident(_) => todo!(),
+        Type::GenericInstance { base, args } => todo!(),
+    };
+
     for inst in ir.insts {
+        let t = inst.assigns.as_ref().map(|a| a.type_.clone());
         let vreg = inst.assigns.and_then(|m| m.as_vreg());
 
         let vreg_s = vreg.as_ref().map(|m| format!("r{}", m));
 
         match inst.inner {
-            crate::ir::InstInner::Alloca => {
-                let v = builder.build_alloca(i64_type, &vreg_s.unwrap()).unwrap();
+            InstInner::Function { name, body } => {}
+            InstInner::Alloca => {
+                let v = builder.build_alloca(get_type(t.unwrap().deref().unwrap()), &vreg_s.unwrap()).unwrap();
 
                 values.insert(vreg.unwrap(), v.as_basic_value_enum());
             }
-            crate::ir::InstInner::BinOp { op, lhs, rhs } => {
+            InstInner::BinOp { op, lhs, rhs } => {
                 let x = access!(lhs).clone();
                 let y = access!(rhs);
-                let v = builder.build_int_add(x.into_int_value(), y.into_int_value(), &vreg_s.unwrap()).unwrap();
+                match op {
+                    BinaryOperation::Add => {
+                        let v = builder
+                            .build_int_add(x.into_int_value(), y.into_int_value(), &vreg_s.unwrap())
+                            .unwrap();
+                        values.insert(vreg.unwrap(), v.as_basic_value_enum());
+                    }
+                    BinaryOperation::Sub => {
+                        let v = builder
+                            .build_int_sub(x.into_int_value(), y.into_int_value(), &vreg_s.unwrap())
+                            .unwrap();
+                        values.insert(vreg.unwrap(), v.as_basic_value_enum());
+                    }
+                    BinaryOperation::Mul => {
+                        let v = builder
+                            .build_int_mul(x.into_int_value(), y.into_int_value(), &vreg_s.unwrap())
+                            .unwrap();
+                        values.insert(vreg.unwrap(), v.as_basic_value_enum());
+                    }
+                    BinaryOperation::Div => {
+                        let v = builder
+                            .build_int_sub(x.into_int_value(), y.into_int_value(), &vreg_s.unwrap())
+                            .unwrap();
+                        values.insert(vreg.unwrap(), v.as_basic_value_enum());
+                    }
+                    BinaryOperation::Eq
+                    | BinaryOperation::Neq
+                    | BinaryOperation::Gte
+                    | BinaryOperation::Gt
+                    | BinaryOperation::Lt
+                    | BinaryOperation::Lte => {
+                        let pred = match op {
+                            BinaryOperation::Eq => inkwell::IntPredicate::EQ,
+                            BinaryOperation::Neq => inkwell::IntPredicate::NE,
+                            _ => unreachable!(),
+                        };
+
+                        let v = builder
+                            .build_int_compare(
+                                pred,
+                                x.into_int_value(),
+                                y.into_int_value(),
+                                &vreg_s.unwrap(),
+                            )
+                            .unwrap();
+                        values.insert(vreg.unwrap(), v.as_basic_value_enum());
+                    }
+                    _ => todo!("{:?}", op),
+                }
+            }
+            InstInner::Load(value) => {
+                let v = builder
+                    .build_load(
+                        i32_type,
+                        access!(value).into_pointer_value(),
+                        &vreg_s.unwrap(),
+                    )
+                    .unwrap();
                 values.insert(vreg.unwrap(), v.as_basic_value_enum());
             }
-            crate::ir::InstInner::Load(value) => {
-                // let v = builder.build_load(access!(value), &vreg_s.unwrap()).unwrap();
-                // values.insert(vreg.unwrap(), v.as_basic_value_enum());
+            InstInner::Store(loc, value) => {
+                builder
+                    .build_store(
+                        access!(loc).into_pointer_value(),
+                        access!(value).into_int_value(),
+                    )
+                    .unwrap();
             }
-            crate::ir::InstInner::Call { fn_name, args } => {
+            InstInner::Call { fn_name, args } => {
                 let args = args
                     .into_iter()
                     .map(|arg| (*access!(arg)).into())
@@ -125,11 +231,46 @@ pub fn codegen(ir: IrSnippet, data: Data, path: impl AsRef<Path>) {
                     .build_call(printf, args.as_slice(), &vreg_s.unwrap())
                     .unwrap();
             }
-            crate::ir::InstInner::Ret(value) => {
-                // let bleh = context.i32_type().const_int(0, false);
+            InstInner::Ret(value) => {
                 builder.build_return(Some(access!(value))).unwrap();
             }
-            _ => {}
+            InstInner::Label(l) => {
+                let lab = basic_blocks.get(&l).unwrap();
+
+                if !builder
+                    .get_insert_block()
+                    .unwrap()
+                    .get_last_instruction()
+                    .map(|i| i.is_terminator())
+                    .unwrap_or(false)
+                {
+                    builder.build_unconditional_branch(*lab).unwrap();
+                }
+
+                builder.position_at_end(*lab);
+            }
+            InstInner::Jmp(loc) => {
+                let bb = basic_blocks.get(&loc).unwrap().clone();
+                builder.build_unconditional_branch(bb).unwrap();
+            }
+            InstInner::Jz(loc, value) => {
+                let bb = basic_blocks.get(&loc).unwrap().clone();
+                let new_bb =
+                    context.append_basic_block(function, &format!("fallthrough{}", new_id()));
+                builder
+                    .build_conditional_branch(access!(value).into_int_value(), new_bb, bb)
+                    .unwrap();
+                builder.position_at_end(new_bb);
+            }
+            InstInner::Cast(value) => {
+                // let v = builder.build_cast(
+                //     InstructionOpcode::Add,
+                //     access!(value).into_int_value(),
+                //     get_type(value.type_),
+                //     &vreg_s.unwrap(),
+                // ).unwrap();
+                // values.insert(vreg.unwrap(), v.as_basic_value_enum());
+            }
         }
     }
 
@@ -155,9 +296,9 @@ pub fn codegen(ir: IrSnippet, data: Data, path: impl AsRef<Path>) {
     // builder.build_return(Some(&sum)).unwrap();
     // builder.build_return(Some(&bleh)).unwrap();
 
+    module.print_to_stderr();
+
     target_machine
         .write_to_file(&module, FileType::Object, path.as_ref())
         .unwrap();
-
-    module.print_to_stderr();
 }

@@ -159,16 +159,14 @@ impl Inst {
             }
             crate::ir::InstInner::Call { args, .. } => args.iter().collect::<Vec<_>>(),
             crate::ir::InstInner::Label(_) => vec![],
-            crate::ir::InstInner::Jnz(_, value) => vec![value],
             crate::ir::InstInner::Jz(_, value) => vec![value],
             crate::ir::InstInner::Jmp(_) => vec![],
             crate::ir::InstInner::Load(value) => vec![value],
             crate::ir::InstInner::Store(value, value1) => vec![value, value1],
-            crate::ir::InstInner::Copy(value) => vec![value],
             crate::ir::InstInner::Alloca => vec![],
-            crate::ir::InstInner::Lea(value) => vec![value],
             crate::ir::InstInner::Function { .. } => vec![],
             crate::ir::InstInner::Ret(value) => vec![value],
+            crate::ir::InstInner::Cast(value) => vec![value],
         };
 
         touches.extend(vals.into_iter().filter_map(|v| v.as_vreg()));

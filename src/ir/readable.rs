@@ -31,11 +31,6 @@ pub fn write_readable<T: std::io::Write>(to: &mut T, ir: &IrSnippet) -> std::io:
                 write!(to, ")")?;
             }
             crate::ir::InstInner::Label(lab) => write!(to, "  lab{}:", lab)?,
-            crate::ir::InstInner::Jnz(lab, value) => {
-                write!(to, "Jnz ")?;
-                write_value(to, value)?;
-                write!(to, "lab{}:", lab)?;
-            }
             crate::ir::InstInner::Jz(lab, value) => {
                 write!(to, "Jz ")?;
                 write_value(to, value)?;
@@ -53,19 +48,15 @@ pub fn write_readable<T: std::io::Write>(to: &mut T, ir: &IrSnippet) -> std::io:
                 write_value(to, vreg)?;
                 write_value(to, value)?;
             }
-            crate::ir::InstInner::Copy(value) => {
-                write!(to, "Copy ")?;
-                write_value(to, value)?;
-            }
             crate::ir::InstInner::Alloca => {
                 write!(to, "Alloca")?;
             }
-            crate::ir::InstInner::Lea(value) => {
-                write!(to, "Lea ")?;
-                write_value(to, value)?;
-            }
             crate::ir::InstInner::Ret(value) => {
                 write!(to, "Ret ")?;
+                write_value(to, value)?;
+            }
+            crate::ir::InstInner::Cast(value) => {
+                write!(to, "Cast ")?;
                 write_value(to, value)?;
             }
             crate::ir::InstInner::Function { .. } => {
@@ -86,8 +77,7 @@ fn write_value(to: &mut impl std::io::Write, val: Value) -> std::io::Result<()> 
         super::ValueInner::ImmediateInt(v) => write!(to, "{}", v)?,
         super::ValueInner::ImmediateFloat(v) => write!(to, "{}_f32", v)?,
         super::ValueInner::ImmediateDouble(v) => write!(to, "{}_f64", v)?,
-        super::ValueInner::ImmediateBool(v) => write!(to, "{}", v)?,
-        super::ValueInner::StringLiteral(v) => write!(to, "\"{}\"", v)?,
+        super::ValueInner::StringLiteral(v) => write!(to, "str({})", v)?,
     }
 
     write!(to, ":{:?} ", val.type_)?;

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    error::CompErr,
-    grammar::{BinaryOperation, Node, NodeInner},
+    error::{CompErr, Range},
+    grammar::{BinaryOperation, Node, NodeInner, UnaryOperation},
     types::{bin_op_coerce, Type, UnknownTypeId},
 };
 
@@ -105,19 +105,18 @@ impl StorageItem {
     }
 }
 
-pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
+pub fn generate(ast: Node, ctx: &mut GenContext, underef: bool) -> Result<IrSnippet, CompErr> {
     let mut insts = Vec::new();
-    let assigns;
+    let mut assigns = None;
 
     match ast.inner {
         NodeInner::StatementList(statements) => {
             for s in statements {
-                let s = generate(s, ctx)?;
+                let s = generate(s, ctx, false)?;
                 insts.extend(s.insts);
             }
 
             // TODO: COPY last and assign
-            assigns = None;
         }
         NodeInner::Indentifier(ident) => {
             let Some(var) = ctx.read_var(&ident) else {
@@ -127,24 +126,26 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                 );
             };
 
-            let Some(mut t) = var.type_.clone().deref() else {
-                return CompErr::new_general(
-                    format!("Cannot derefernce {:?}", var.type_),
-                    ast.range,
-                );
-            };
+            if underef {
+                assigns = Some(var.as_value());
+            } else {
+                let Some(t) = var.type_.clone().deref() else {
+                    return CompErr::new_general(
+                        format!("Cannot derefernce {:?}", var.type_),
+                        ast.range,
+                    );
+                };
 
-            assigns = Some(new_vreg(t));
+                assigns = Some(new_vreg(t));
 
-            insts.push(Inst {
-                assigns: assigns.clone(),
-                inner: InstInner::Load(var.as_value()),
-            });
+                insts.push(Inst {
+                    assigns: assigns.clone(),
+                    inner: InstInner::Load(var.as_value()),
+                });
+            }
         }
         NodeInner::Function { name, body } => {
-            assigns = None;
-
-            let body = generate(*body, ctx)?;
+            let body = generate(*body, ctx, false)?;
 
             insts.push(Inst {
                 assigns: assigns.clone(),
@@ -155,7 +156,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             let mut arg_values = Vec::with_capacity(args.len());
 
             for arg in args {
-                let arg = generate(arg, ctx)?;
+                let arg = generate(arg, ctx, false)?;
 
                 let Some(val) = arg.assigns else {
                     return CompErr::new_general(
@@ -184,8 +185,8 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             then_branch,
             else_branch,
         } => {
-            let cond = generate(*condition, ctx)?;
-            let then = generate(*then_branch, ctx)?;
+            let cond = generate(*condition, ctx, false)?;
+            let then = generate(*then_branch, ctx, false)?;
 
             let Some(cond_val) = cond.assigns else {
                 return CompErr::new_general(
@@ -223,7 +224,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             });
 
             if let Some(eb) = else_branch {
-                let else_ = generate(*eb, ctx)?;
+                let else_ = generate(*eb, ctx, false)?;
 
                 insts.extend(else_.insts);
 
@@ -232,8 +233,6 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                     inner: InstInner::Label(end_label),
                 });
             };
-
-            assigns = None;
         }
         NodeInner::BinaryOperation(BinaryOperation::Declare, lhs, rhs)
         | NodeInner::BinaryOperation(BinaryOperation::DeclareConst, lhs, rhs) => {
@@ -246,68 +245,40 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
             decleration(&mut insts, ctx, ast.range, &ident, None, rhs)?;
 
-            assigns = None;
             // rhs_val
         }
         NodeInner::TypedDeclare { name, type_, value } => {
             decleration(&mut insts, ctx, ast.range, &name, Some(type_), value)?;
 
-            assigns = None;
             // rhs_val
         }
-        NodeInner::BinaryOperation(op, lhs, rhs) => {
-            let lhs = generate(*lhs, ctx)?;
-            let rhs = generate(*rhs, ctx)?;
-            let Some(lhs_val) = lhs.assigns else {
-                return CompErr::new_general(
-                    format!(
-                        "Left hand side of {} was not a valid expression",
-                        op.stringify()
-                    ),
-                    ast.range,
-                );
-            };
+        NodeInner::BinaryOperation(BinaryOperation::Assign, lhs, rhs) => {
+            let rhs = generate(*rhs, ctx, false)?;
             let Some(rhs_val) = rhs.assigns else {
                 return CompErr::new_general(
-                    format!(
-                        "Right hand side of {} was not a valid expression",
-                        op.stringify()
-                    ),
+                    "Right hand side of assignment was not a valid expression",
                     ast.range,
                 );
             };
-            insts.extend(lhs.insts);
             insts.extend(rhs.insts);
 
-            let Some(t) = bin_op_coerce(&lhs_val.type_, &rhs_val.type_) else {
-                return CompErr::new_general(
-                    format!(
-                        "Could not apply operation {} to types {:?} and {:?}",
-                        op.stringify(),
-                        lhs_val.type_,
-                        rhs_val.type_,
-                    ),
-                    ast.range,
-                );
-            };
-
-            assigns = Some(new_vreg(t));
-
-            insts.push(Inst {
-                assigns: assigns.clone(),
-                inner: InstInner::BinOp {
-                    op,
-                    lhs: lhs_val,
-                    rhs: rhs_val,
-                },
-            });
+            assign(ctx, &mut insts, lhs, rhs_val, ast.range)?;
+        }
+        NodeInner::BinaryOperation(BinaryOperation::AssignAnd(op), lhs, rhs) => {
+            let val = perform_bin_op(ctx, &mut insts, *op, &*lhs, &*rhs, &ast.range)?;
+            assign(ctx, &mut insts, lhs, val, ast.range)?;
+        }
+        NodeInner::BinaryOperation(op, lhs, rhs) => {
+            assigns = Some(perform_bin_op(
+                ctx, &mut insts, op, &*lhs, &*rhs, &ast.range,
+            )?);
         }
         NodeInner::Literal(value) => {
             assigns = Some(value);
         }
         NodeInner::Scope(body) => {
             ctx.push_scope();
-            let body = generate(*body, ctx)?;
+            let body = generate(*body, ctx, false)?;
             ctx.pop_scope();
 
             insts.extend(body.insts);
@@ -325,7 +296,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
             ctx.push_scope();
 
-            let cond = generate(*condition, ctx)?;
+            let cond = generate(*condition, ctx, false)?;
             insts.extend(cond.insts);
 
             let Some(cond_val) = cond.assigns else {
@@ -340,7 +311,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                 inner: InstInner::Jz(end_label, cond_val),
             });
 
-            let body = generate(*body, ctx)?;
+            let body = generate(*body, ctx, false)?;
             insts.extend(body.insts);
 
             ctx.pop_scope();
@@ -354,11 +325,14 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                 assigns: None,
                 inner: InstInner::Label(end_label),
             });
-
-            assigns = None;
+        }
+        NodeInner::UnaryOperation(UnaryOperation::AddressOf, value) => {
+            let lhs = generate(*value, ctx, true)?;
+            insts.extend(lhs.insts);
+            assigns = lhs.assigns;
         }
         NodeInner::UnaryOperation(op, value) => {
-            let lhs = generate(*value, ctx)?;
+            let lhs = generate(*value, ctx, false)?;
             let Some(lhs_val) = lhs.assigns else {
                 return CompErr::new_general(
                     format!(
@@ -414,16 +388,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                         inner: InstInner::Load(lhs_val),
                     });
                 }
-                crate::grammar::UnaryOperation::AddressOf => {
-                    let t = Type::Ptr(Box::new(lhs_val.type_.clone()));
-
-                    assigns = Some(new_vreg(t));
-
-                    insts.push(Inst {
-                        assigns: assigns.clone(),
-                        inner: InstInner::Lea(lhs_val),
-                    });
-                }
+                crate::grammar::UnaryOperation::AddressOf => unreachable!(),
             }
         }
         NodeInner::For { var, range, body } => {
@@ -451,7 +416,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
             let it = ctx.declare(&it, Type::Void);
 
-            let range = generate(*range, ctx)?;
+            let range = generate(*range, ctx, false)?;
             insts.extend(range.insts);
 
             let Some(cond_val) = range.assigns else {
@@ -460,7 +425,7 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
 
             // TODO
 
-            let body = generate(*body, ctx)?;
+            let body = generate(*body, ctx, false)?;
             insts.extend(body.insts);
 
             ctx.pop_scope();
@@ -474,11 +439,9 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
                 assigns: None,
                 inner: InstInner::Label(end_label),
             });
-
-            assigns = None;
         }
         NodeInner::Return(value) => {
-            let rhs = generate(*value, ctx)?;
+            let rhs = generate(*value, ctx, false)?;
             let Some(rhs_value) = rhs.assigns else {
                 return CompErr::new_general("Return value was not a valid expression", ast.range);
             };
@@ -497,8 +460,6 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
             //     );
             // };
 
-            assigns = None;
-
             insts.push(Inst {
                 assigns: assigns.clone(),
                 inner: InstInner::Ret(rhs_value),
@@ -508,6 +469,78 @@ pub fn generate(ast: Node, ctx: &mut GenContext) -> Result<IrSnippet, CompErr> {
     }
 
     Ok(IrSnippet { insts, assigns })
+}
+
+fn assign(
+    ctx: &mut GenContext,
+    insts: &mut Vec<Inst>,
+    lhs: Box<Node>,
+    rhs_val: Value,
+    range: Range,
+) -> Result<(), CompErr> {
+    let lhs = generate(*lhs, ctx, true)?;
+    let Some(lhs_val) = lhs.assigns else {
+        return CompErr::new_general(
+            "Left hand side of assignment was not a valid expression",
+            range,
+        );
+    };
+    insts.extend(lhs.insts);
+    let Type::Ptr(ref lhs_inner) = lhs_val.type_ else {
+        return CompErr::new_general("Can not assign to lhs", range);
+    };
+    let _ = bin_op_coerce(&lhs_inner, &rhs_val.type_, ctx, range)?;
+    insts.push(Inst {
+        assigns: None,
+        inner: InstInner::Store(lhs_val, rhs_val),
+    });
+    Ok(())
+}
+
+fn perform_bin_op(
+    ctx: &mut GenContext,
+    insts: &mut Vec<Inst>,
+    op: BinaryOperation,
+    lhs: &Node,
+    rhs: &Node,
+    range: &Range,
+) -> Result<Value, CompErr> {
+    let lhs = generate(lhs.clone(), ctx, false)?;
+    let rhs = generate(rhs.clone(), ctx, false)?;
+    let Some(lhs_val) = lhs.assigns else {
+        return CompErr::new_general(
+            format!(
+                "Left hand side of {} was not a valid expression",
+                op.stringify()
+            ),
+            range.clone(),
+        );
+    };
+    let Some(rhs_val) = rhs.assigns else {
+        return CompErr::new_general(
+            format!(
+                "Right hand side of {} was not a valid expression",
+                op.stringify()
+            ),
+            range.clone(),
+        );
+    };
+    insts.extend(lhs.insts);
+    insts.extend(rhs.insts);
+    let mut t = bin_op_coerce(&lhs_val.type_, &rhs_val.type_, ctx, range.clone())?;
+    if op.logical_output() {
+        t = Type::Boolean;
+    }
+    let assigns = new_vreg(t);
+    insts.push(Inst {
+        assigns: Some(assigns.clone()),
+        inner: InstInner::BinOp {
+            op,
+            lhs: lhs_val,
+            rhs: rhs_val,
+        },
+    });
+    Ok(assigns)
 }
 
 fn decleration(
@@ -521,7 +554,7 @@ fn decleration(
     if let NodeInner::Type(t) = rhs.inner {
         ctx.define_type(&ident, t);
     } else {
-        let rhs = generate(*rhs, ctx)?;
+        let rhs = generate(*rhs, ctx, false)?;
         let Some(rhs_val) = rhs.assigns else {
             return CompErr::new_general(
                 format!("Right hand side of assignment was not a valid expression",),
@@ -532,9 +565,12 @@ fn decleration(
 
         let type_ = type_.unwrap_or_else(|| rhs_val.type_.clone());
 
-        if let Type::Auto(ids) = &rhs_val.type_ {
-            for id in ids {
-                ctx.auto_map.insert(*id, type_.clone());
+        if !matches!(type_, Type::Auto(_)) {
+            if let Type::Auto(ids) = &rhs_val.type_ {
+                for id in ids {
+                    assert!(!matches!(type_, Type::Auto(_)));
+                    ctx.auto_map.insert(*id, type_.clone());
+                }
             }
         }
 

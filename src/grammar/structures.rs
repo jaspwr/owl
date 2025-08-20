@@ -154,4 +154,18 @@ impl BinaryOperation {
             _ => "???",
         }
     }
+
+    pub(crate) fn logical_output(&self) -> bool {
+        matches!(
+            self,
+            Self::Eq
+                | Self::Neq
+                | Self::Lt
+                | Self::Gt
+                | Self::Lte
+                | Self::Gte
+                | Self::And
+                | Self::Or
+        )
+    }
 }

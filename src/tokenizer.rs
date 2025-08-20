@@ -138,6 +138,11 @@ pub fn tokenize<'src>(source: &'src str) -> Vec<Token<'src>> {
         }
 
         if c == '"' {
+            if last_char == '\\' && in_string_literal {
+                last_char = c;
+                continue;
+            }
+
             if in_string_literal {
                 last_category = CharCategory::StringLiteral;
             }
@@ -145,10 +150,12 @@ pub fn tokenize<'src>(source: &'src str) -> Vec<Token<'src>> {
             in_string_literal = !in_string_literal;
             append(i, last_category);
             last_category = CharCategory::None;
+            last_char = c;
             continue;
         }
 
         if in_string_literal {
+            last_char = c;
             continue;
         }
 

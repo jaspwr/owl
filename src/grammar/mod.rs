@@ -4,6 +4,7 @@ mod error;
 mod parse;
 mod structures;
 mod utils;
+mod string_literal;
 
 pub(self) use crate::tokenizer::{Token, TokenKind};
 pub(self) use error::*;

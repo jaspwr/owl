@@ -238,26 +238,6 @@ fn import<'s, 't>(
     primary_expression(ts, ctx)
 }
 
-fn function_assignment_name<'t, 's>(
-    ts: Tokens<'t, 's>,
-    ctx: &mut ParsingConext,
-) -> Option<(Tokens<'t, 's>, Ast)> {
-    if let Ok((ts, name)) = literal(ts, ctx) {
-        return Some((ts, name));
-    }
-
-    if let Some(next) = peek(ts) {
-        if next.kind == TokenKind::Operator {
-            return Some((
-                &ts[1..],
-                NodeInner::Indentifier(next.token.to_string()).to_node(next.range),
-            ));
-        }
-    }
-
-    None
-}
-
 // fn assignment<'t, 's>(
 //     ts: Tokens<'t, 's>,
 //     ctx: &mut ParsingConext,
@@ -1117,7 +1097,8 @@ fn literal<'t, 's>(
         }
 
         if token.kind == TokenKind::QuotedString {
-            let id = ctx.new_string_literal(token.token);
+            let new = string_literal::unescape(token.token, token.range)?;
+            let id = ctx.new_string_literal(&new);
             let node = NodeInner::Literal(crate::ir::Value::string_literal(id));
             return Ok((&ts[1..], node.to_node(token.range)));
         }

@@ -1,0 +1,31 @@
+Foo :: struct {
+    a: f64,
+    b: ***bool,
+}
+
+a: u8 = 3 + 23 * 0x23 - 4
+printf("%f", a);
+
+bleh := !true
+
+fn blhe() {
+    if true { 
+        b: bool = false
+        
+        println(b && false)
+
+        a := 3
+        a += 2
+        a = a + 2
+
+        b: f32 = * &a
+
+        println(2+2*(5+4 + a))
+    } else {
+        println() 
+    }
+
+    while true {
+        println(2) 
+    }
+}

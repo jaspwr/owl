@@ -32,7 +32,7 @@ fn main() {
         println!("{:?}", pr.ast);
 
         let mut ctx = ir::GenContext::new();
-        let snippet = ir::generate(pr.ast, &mut ctx);
+        let snippet = ir::generate(pr.ast, &mut ctx, false);
 
         if let Err(e) = snippet {
             e.print(&src);

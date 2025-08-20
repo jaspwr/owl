@@ -1,3 +1,30 @@
-printf("Hello, World!
-")
+Foo :: struct {
+    a: f64,
+    b: Baz,
+}
+
+i: i64 = 2;
+b := 5;
+i = 4 + b;
+printf("%d\n", i + 5)
+printf("%d\n", i == 2)
+printf("%d\n", i != 2)
+
+if i == 3 printf("yep\n") else printf("nope\n")
+
+if i == 2
+    printf("1yep\n")
+else
+    printf("1nope\n")
+
+while i != 20 {
+    printf("%d\n", i)
+    i += 1
+}
+
+/ while false {
+/    printf("%d\n", 1234 + 1000 + 3 - 1000 - 3)
+/ }
+
+printf("Hello, World!\n")
 return 2 + 4
