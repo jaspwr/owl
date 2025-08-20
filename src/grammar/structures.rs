@@ -16,12 +16,20 @@ pub enum NodeInner {
     StatementList(Vec<Node>),
     String(String),
     Indentifier(String),
-    DoubleLiteral(f64),
-    BoolLiteral(bool),
+    Literal(crate::ir::Value),
     Assignment {
         name: Box<Node>,
         args: Vec<Node>,
         body: Box<Node>,
+    },
+    Function {
+        name: String,
+        body: Box<Node>,
+    },
+    TypedDeclare {
+        name: String,
+        type_: Type,
+        value: Box<Node>,
     },
     Lambda {
         args: Vec<Node>,
@@ -134,6 +142,7 @@ pub enum BinaryOperation {
     EnvAssign,
     Pipe,
     SemiColon,
+    Xor,
     Custom(String),
 }
 

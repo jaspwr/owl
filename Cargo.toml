@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 arrayvec = "0.7.6"
-# inkwell = { git = "https://github.com/TheDan64/inkwell", features = ["llvm18-1-force-static", "target-all"] }
+inkwell = { git = "https://github.com/TheDan64/inkwell", default-features = false, features = ["llvm18-1-force-static"] }
 owo-colors = "4.2.0"

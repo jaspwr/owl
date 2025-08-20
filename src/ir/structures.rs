@@ -1,6 +1,6 @@
 use std::sync::atomic::AtomicU64;
 
-use crate::{grammar::BinaryOperation, types::Type};
+use crate::{grammar::BinaryOperation, ir::IrSnippet, types::Type};
 
 #[derive(Debug, Clone)]
 pub struct Inst {
@@ -12,6 +12,10 @@ pub type InstLoc = usize;
 
 #[derive(Debug, Clone)]
 pub enum InstInner {
+    Function {
+        name: String,
+        body: IrSnippet,
+    },
     BinOp {
         op: BinaryOperation,
         lhs: Value,
@@ -25,6 +29,7 @@ pub enum InstInner {
     Jnz(VregId, Value),
     Jz(VregId, Value),
     Jmp(VregId),
+    Ret(Value),
     Load(Value),
     Store(Value, Value),
     Copy(Value),
@@ -46,8 +51,13 @@ pub struct Value {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ValueInner {
-    Immediate([u8; 16]),
     Vreg(VregId),
+    Immediate([u8; 16]),
+    ImmediateInt(i64),
+    ImmediateFloat(f32),
+    ImmediateDouble(f64),
+    ImmediateBool(bool),
+    StringLiteral(usize),
 }
 
 pub fn new_vreg(type_: Type) -> Value {
@@ -65,5 +75,35 @@ impl Value {
 
         None
     }
-}
 
+    pub fn int_immediate(arg: i64) -> Self {
+        Self {
+            type_: Type::new_auto(),
+            inner: ValueInner::ImmediateInt(arg),
+        }
+    }
+
+    pub fn float_immediate(arg: f64) -> Self {
+        Self {
+            type_: Type::new_auto(),
+            inner: ValueInner::ImmediateDouble(arg),
+        }
+    }
+
+    pub(crate) fn bool_immediate(arg: bool) -> Value {
+        Self {
+            type_: Type::Boolean,
+            inner: ValueInner::ImmediateBool(arg),
+        }
+    }
+
+    pub fn string_literal(string_id: usize) -> Value {
+        Value {
+            type_: Type::Ptr(Box::new(Type::Integer {
+                bits: 8,
+                signed: false,
+            })),
+            inner: ValueInner::StringLiteral(string_id),
+        }
+    }
+}

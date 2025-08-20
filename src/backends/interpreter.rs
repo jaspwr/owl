@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{ir::{InstInner, InstLoc, IrSnippet}, reg_alloc::{self, PoolId, RegType}};
+use crate::{
+    ir::{InstInner, InstLoc, IrSnippet},
+    reg_alloc::{self, PoolId, RegType},
+};
 
 pub fn exec(ir: IrSnippet) {
     let allocs = reg_alloc::alloc(&ir);
@@ -11,13 +14,20 @@ pub fn exec(ir: IrSnippet) {
 
     let mut long_regs = [0_u64; 32];
 
-    let access = |pool: PoolId, index: usize| {
-        match pool {
-            PoolId { reg_type: RegType::Float, bits: 32 } => &mut float_regs[index] as *mut _ as *mut (),
-            PoolId { reg_type: RegType::Float, bits: 64 } => &mut double_regs[index] as *mut _ as *mut (),
-            PoolId { reg_type: RegType::Int, bits: 64 } => &mut long_regs[index] as *mut _ as *mut (),
-            _ => panic!(),
-        }
+    let access = |pool: PoolId, index: usize| match pool {
+        PoolId {
+            reg_type: RegType::Float,
+            bits: 32,
+        } => &mut float_regs[index] as *mut _ as *mut (),
+        PoolId {
+            reg_type: RegType::Float,
+            bits: 64,
+        } => &mut double_regs[index] as *mut _ as *mut (),
+        PoolId {
+            reg_type: RegType::Int,
+            bits: 64,
+        } => &mut long_regs[index] as *mut _ as *mut (),
+        _ => panic!(),
     };
 
     let mut label_map = HashMap::new();
@@ -34,19 +44,20 @@ pub fn exec(ir: IrSnippet) {
     while pc < ir.insts.len() {
         let inst = &ir.insts[pc];
 
-        match &inst.inner {
-            InstInner::BinOp { op, lhs, rhs } => {}
-            InstInner::Call { fn_name, args } => todo!(),
-            InstInner::Label(_) => {}
-            InstInner::Jnz(_, value) => todo!(),
-            InstInner::Jz(_, value) => todo!(),
-            InstInner::Jmp(l) => pc = *label_map.get(&l).unwrap(),
-            InstInner::Load(_) => todo!(),
-            InstInner::Store(_, value) => todo!(),
-            InstInner::Copy(value) => todo!(),
-            InstInner::Alloca => todo!(),
-            InstInner::Lea(value) => todo!(),
-        }
+        // match &inst.inner {
+        //     InstInner::BinOp { op, lhs, rhs } => {}
+        //     InstInner::Call { fn_name, args } => todo!(),
+        //     InstInner::Label(_) => {}
+        //     InstInner::Jnz(_, value) => todo!(),
+        //     InstInner::Jz(_, value) => todo!(),
+        //     InstInner::Jmp(l) => pc = *label_map.get(&l).unwrap(),
+        //     InstInner::Load(_) => todo!(),
+        //     InstInner::Store(_, value) => todo!(),
+        //     InstInner::Copy(value) => todo!(),
+        //     InstInner::Alloca => todo!(),
+        //     InstInner::Lea(value) => todo!(),
+        //     InstInner::Function { name, body } => todo!(),
+        // }
 
         pc += 1;
     }

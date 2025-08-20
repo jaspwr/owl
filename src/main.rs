@@ -1,13 +1,16 @@
 use std::env;
 
-pub mod grammar;
-pub mod tokenizer;
-pub mod ir;
-pub mod utils;
-pub mod error;
-pub mod types;
+use crate::ir::backpatch_types;
+
 pub mod backends;
+pub mod error;
+pub mod grammar;
+pub mod ir;
 pub mod reg_alloc;
+pub mod tokenizer;
+pub mod types;
+pub mod utils;
+pub mod data;
 
 fn main() {
     if env::args().len() == 2 {
@@ -17,28 +20,36 @@ fn main() {
         let tokens = tokenizer::tokenize(&src);
         println!("{:?}", tokens);
 
-        let ast = grammar::parse(&tokens);
+        let pr = grammar::parse(&tokens);
 
-        if let Err(e) = ast {
+        if let Err(e) = pr {
             e.to_comp_err().print(&src);
             return;
         }
 
-        let ast = ast.unwrap();
+        let pr = pr.unwrap();
 
-        println!("{:?}", ast);
+        println!("{:?}", pr.ast);
 
-        let snippet = ir::generate(ast, &mut ir::GenContext::new());
+        let mut ctx = ir::GenContext::new();
+        let snippet = ir::generate(pr.ast, &mut ctx);
 
         if let Err(e) = snippet {
             e.print(&src);
             return;
         }
 
-        let snippet = snippet.unwrap();
+        let mut snippet = snippet.unwrap();
+
+        backpatch_types(&mut ctx, &mut snippet);
+        backpatch_types(&mut ctx, &mut snippet);
+
+        let data = data::Data {
+            string_literals: pr.string_literals
+        };
 
         snippet.debug_print();
 
-        backends::codegen(snippet, "bleh.asm");
+        backends::codegen(snippet, data, "bleh.o");
     }
 }

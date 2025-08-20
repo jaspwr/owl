@@ -167,6 +167,8 @@ impl Inst {
             crate::ir::InstInner::Copy(value) => vec![value],
             crate::ir::InstInner::Alloca => vec![],
             crate::ir::InstInner::Lea(value) => vec![value],
+            crate::ir::InstInner::Function { .. } => vec![],
+            crate::ir::InstInner::Ret(value) => vec![value],
         };
 
         touches.extend(vals.into_iter().filter_map(|v| v.as_vreg()));
