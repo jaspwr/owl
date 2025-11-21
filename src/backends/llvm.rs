@@ -179,6 +179,24 @@ pub fn codegen(ir: IrSnippet, data: Data, path: impl AsRef<Path>) {
                             .unwrap();
                         values.insert(vreg.unwrap(), v.as_basic_value_enum());
                     }
+                    BinaryOperation::Mod => {
+                        let v = builder
+                            .build_int_signed_rem(x.into_int_value(), y.into_int_value(), &vreg_s.unwrap())
+                            .unwrap();
+                        values.insert(vreg.unwrap(), v.as_basic_value_enum());
+                    }
+                    BinaryOperation::Xor => {
+                        let v = builder
+                            .build_xor(x.into_int_value(), y.into_int_value(), &vreg_s.unwrap())
+                            .unwrap();
+                        values.insert(vreg.unwrap(), v.as_basic_value_enum());
+                    }
+                    BinaryOperation::And => {
+                        let v = builder
+                            .build_and(x.into_int_value(), y.into_int_value(), &vreg_s.unwrap())
+                            .unwrap();
+                        values.insert(vreg.unwrap(), v.as_basic_value_enum());
+                    }
                     BinaryOperation::Eq
                     | BinaryOperation::Neq
                     | BinaryOperation::Gte
@@ -188,6 +206,10 @@ pub fn codegen(ir: IrSnippet, data: Data, path: impl AsRef<Path>) {
                         let pred = match op {
                             BinaryOperation::Eq => inkwell::IntPredicate::EQ,
                             BinaryOperation::Neq => inkwell::IntPredicate::NE,
+                            BinaryOperation::Gt => inkwell::IntPredicate::SGT,
+                            BinaryOperation::Lt => inkwell::IntPredicate::SLT,
+                            BinaryOperation::Lte => inkwell::IntPredicate::SLE,
+                            BinaryOperation::Gte => inkwell::IntPredicate::SGE,
                             _ => unreachable!(),
                         };
 

@@ -121,6 +121,7 @@ pub enum BinaryOperation {
     Sub,
     Mul,
     Div,
+    Mod,
     Pow,
     Eq,
     Neq,

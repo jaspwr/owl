@@ -3,6 +3,7 @@ use std::env;
 use crate::ir::backpatch_types;
 
 pub mod backends;
+pub mod data;
 pub mod error;
 pub mod grammar;
 pub mod ir;
@@ -10,7 +11,6 @@ pub mod reg_alloc;
 pub mod tokenizer;
 pub mod types;
 pub mod utils;
-pub mod data;
 
 fn main() {
     if env::args().len() == 2 {
@@ -45,11 +45,19 @@ fn main() {
         backpatch_types(&mut ctx, &mut snippet);
 
         let data = data::Data {
-            string_literals: pr.string_literals
+            string_literals: pr.string_literals,
         };
 
         snippet.debug_print();
 
-        backends::codegen(snippet, data, "bleh.o");
+        let obj = "bleh.o";
+
+        backends::codegen(snippet, data, obj);
+
+        let mut proc = std::process::Command::new("gcc").arg(obj).spawn().unwrap();
+
+        let _ = proc.wait().unwrap();
+
+        std::fs::remove_file(obj).unwrap();
     }
 }

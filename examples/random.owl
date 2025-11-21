@@ -4,7 +4,7 @@ Foo :: struct {
 }
 
 a: u8 = 3 + 23 * 0x23 - 4
-printf("%f", a);
+printf("%d", a);
 
 bleh := !true
 
@@ -25,7 +25,9 @@ fn blhe() {
         println() 
     }
 
-    while true {
+    while false {
         println(2) 
     }
 }
+
+return 0;

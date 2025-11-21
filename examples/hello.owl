@@ -10,9 +10,10 @@ printf("%d\n", i + 5)
 printf("%d\n", i == 2)
 printf("%d\n", i != 2)
 
+i: i32 = 3
 if i == 3 printf("yep\n") else printf("nope\n")
 
-if i == 2
+if (* &i) == 2
     printf("1yep\n")
 else
     printf("1nope\n")

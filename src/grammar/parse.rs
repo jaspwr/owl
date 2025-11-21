@@ -627,7 +627,7 @@ fn custom_<'t, 's>(
     let known_ops = vec![
         "==", "<", ">", "<=", ">=", "&&", "||", "++", "//", "!!", "=", ":=", "+=", "-=", "*=",
         "//=", "&&=", "||=", "++=", "**=", "+", "-", "*", "$=", "**", "|", "..", "..=", "->", "λ",
-        ",", ";", "</", ">>", "!=", "::", "&",
+        ",", ";", "</", ">>", "!=", "::", "&", "%",
     ];
 
     let Some(next) = peek(ts) else {
@@ -663,7 +663,8 @@ left_associtive_binary_infix_operator!(add, add_, mul,
 
 left_associtive_binary_infix_operator!(mul, mul_, unary_minus,
     {"*", BinaryOperation::Mul},
-    {"//", BinaryOperation::Div}
+    {"//", BinaryOperation::Div},
+    {"%", BinaryOperation::Mod}
 );
 
 fn unary_minus<'t, 's>(
